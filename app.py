@@ -1,21 +1,9 @@
 import base64
-import email
 import re
-
 from flask import Flask, jsonify
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
+import quickstart
 
 app = Flask(__name__)
-
-SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
-
-def get_gmail_service():
-    # This will initiate an OAuth flow in your browser when hit via the Flask route.
-    flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-    creds = flow.run_local_server(port=0)
-    service = build('gmail', 'v1', credentials=creds)
-    return service
 
 @app.route('/')
 def hello():
@@ -24,7 +12,8 @@ def hello():
 @app.route('/fetch_bank_emails')
 def fetch_bank_emails():
     # Authenticate and build the service
-    service = get_gmail_service()
+    service = quickstart.auth()
+    # This function will authenticate the user and return a Gmail service instance.
     
     # Basic Gmail search query to find potential banking emails:
     # Searching for specific bank domains or keywords.
@@ -52,7 +41,7 @@ def fetch_bank_emails():
         payload_parts = msg_data['payload'].get('parts', [])
         
         # For demonstration, we'll just gather all text parts we find
-        body_texts = []
+        transactions_found = []
         
         for part in payload_parts:
             data = part['body'].get('data')
@@ -60,13 +49,36 @@ def fetch_bank_emails():
                 decoded_text = base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
                 # If it matches typical bank keywords, we consider it relevant
                 if re.search(r'\b(debited|credited|transaction|account|bank)\b', decoded_text.lower()):
-                    body_texts.append(decoded_text)
+                    info = {}
+
+                    amount_match = re.search(r'Rs\.?\s?(\d+(?:\.\d+))', decoded_text)
+                    if amount_match:
+                        info['amount'] = amount_match.group(1)
+
+                    detail_match = re.search(
+                        r'to\s+VPA\s+([\S]+)\s+(.*?)\s+on\s+(\d{2}-\d{2}-\d{2})',
+                        decoded_text
+                    )
+                    if detail_match:
+                        info['upi_id'] = detail_match.group(1)
+                        info['receiver'] = detail_match.group(2)
+                        info['date'] = detail_match.group(3)
+
+                    ref_match = re.search(
+                        r'UPI transaction reference number is\s+(\S+)',
+                        decoded_text
+                    )
+                    if ref_match:
+                        info['upi_reference'] = ref_match.group(1)
+
+                    if info:
+                        transactions_found.append(info)
         
         # If we found any relevant text, add it to the results
-        if body_texts:
+        if transactions_found:
             email_data_list.append({
                 'subject': subject,
-                'body': "\n\n".join(body_texts)
+                'info': transactions_found,
             })
     
     # Return the found emails as JSON
