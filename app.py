@@ -2,6 +2,7 @@ import base64
 import re
 from flask import Flask, jsonify
 import quickstart
+import classify
 
 app = Flask(__name__)
 
@@ -17,7 +18,7 @@ def fetch_bank_emails():
     
     # Basic Gmail search query to find potential banking emails:
     # Searching for specific bank domains or keywords.
-    query = '(from:@hdfcbank.com OR from:@icicibank.com OR from:@axisbank.com OR debited OR credited OR bank)'
+    query = '(from:@hdfcbank.com OR from:@icicibank.com OR from:@axisbank.com OR debited OR credited)'
     
     # Retrieve message IDs matching the query
     results = service.users().messages().list(userId='me', q=query).execute()
@@ -50,7 +51,7 @@ def fetch_bank_emails():
                 # If it matches typical bank keywords, we consider it relevant
                 if re.search(r'\b(debited|credited|transaction|account|bank)\b', decoded_text.lower()):
                     info = {}
-
+                    info['type'] = re.search(r'\b(debited|credited)\b', decoded_text.lower()).group(0) if re.search(r'\b(debited|credited)\b', decoded_text.lower()) else None
                     amount_match = re.search(r'Rs\.?\s?(\d+(?:\.\d+))', decoded_text)
                     if amount_match:
                         info['amount'] = amount_match.group(1)
@@ -62,10 +63,11 @@ def fetch_bank_emails():
                     if detail_match:
                         info['upi_id'] = detail_match.group(1)
                         info['receiver'] = detail_match.group(2)
+                        info['class'] = classify.classify_transaction(detail_match.group(2))
                         info['date'] = detail_match.group(3)
 
                     ref_match = re.search(
-                        r'UPI transaction reference number is\s+(\S+)',
+                        r'UPI transaction reference number is\s+(\d+)',
                         decoded_text
                     )
                     if ref_match:
