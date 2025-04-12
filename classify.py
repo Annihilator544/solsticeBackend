@@ -1,11 +1,33 @@
-def classify_transaction(receiver):
+def classify_transaction(receiver, categories=None):
+    if categories is None:
+        categories = {
+            "food": [
+                "zomato", "eatclub", "swiggy", "food", "restaurant",
+                "domino", "pizza", "mcdonald", "kfc"
+            ],
+            "bills": [
+                "bill", "electricity", "gas", "recharge", "academy",
+                "education", "insurance", "loan", "water", "broadband", "wifi"
+            ],
+            "leisure": [
+                "movie", "theatre", "ticket", "pvr", "game", "bowling",
+                "club", "netflix", "prime", "hotstar", "spotify"
+            ],
+            "travel": [
+                "uber", "ola", "irctc", "makemytrip", "goibibo", "flight",
+                "booking", "airbnb", "hotel"
+            ],
+            "shopping": [
+                "amazon", "flipkart", "myntra", "snapdeal", "nykaa",
+                "tatacliq", "store"
+            ],
+            "merchant": [
+                "private limited", "enterprise", "enterprises", "merchant", "biz"
+            ]
+        }
+
     receiver_lower = receiver.lower()
-    if any(x in receiver_lower for x in ["zomato", "eatclub", "swiggy", "food", "restaurant"]):
-        return "food"
-    if any(x in receiver_lower for x in ["academy", "education", "bill", "electricity", "gas", "recharge"]):
-        return "bills"
-    if any(x in receiver_lower for x in ["movie", "theatre", "ticket", "pvr", "game", "bowling", "club"]):
-        return "leisure"
-    if any(x in receiver_lower for x in ["private limited", "enterprise", "enterprises"]):
-        return "merchant"
+    for category, keywords in categories.items():
+        if any(k in receiver_lower for k in keywords):
+            return category
     return "other"
